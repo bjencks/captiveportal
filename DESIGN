@@ -1,0 +1,63 @@
+This is a captive portal system designed to integrate with an existing
+application.
+
+Features:
+ * Integrates with existing applications, rather than using RADIUS. This allows
+   the application to retain all the details of the user sessions and control
+   authentication using its own user database.
+ * Full support for IPv6. Because the access control component relies only on
+   MAC addresses, any higher-level protocol will function properly. The session
+   management component monitors neighbor tables, which work the same in v4 and
+   v6 (ARP and ND).
+ * The session management, access control, and redirector components are written
+   in Python using only the standard library for easy installation on
+   stripped-down systems such as linux routers.
+
+There are four components:
+ * The session manager monitors the ARP and ND tables on the router and reports
+   when sessions start and end by POSTing to an endpoint in the controller.
+ * The controller contains most of the business logic. It is generally
+   a component of the existing application, provides the user-visible splash
+   page (making it easy to match look-and-feel), and manages user login using
+   whatever credentials are appropriate (user/pass, cookies, or more exotic
+   methods). It uses user logins plus session start/end events to notify the
+   access control component when to grant and revoke Internet access to each MAC
+   address. Because it has access to both logins and IP/mac sessions, it can
+   easily generate audit trails of which user used which IP address at what
+   time.
+ * The access control manager receives grant/revoke requests from the controller
+   and manages the iptables rules appropriately.
+ * The redirector receives the users' hijacked HTTP requests and generates
+   redirects to the controller's splash page.
+
+Endpoints the controller provides:
+ * <baseurl>/splash?mac=aabbcc112233&origurl=<escaped-url>
+   This is where the user is redirected initially.
+ * <baseurl>/session
+   The session manager POSTs to this endpoint whenever a session starts or ends.
+   The parameters are:
+   * action=[start|end]
+   * source=[arp|nd|radius|dhcp]
+   * mac=aabbcc112233
+   * Zero or one of:
+     * ipv4=192.0.2.15
+     * ipv6=2001:db8::57
+   * time=2011-08-13T17:12:52 (Almost-ISO format timestamp, 1-second precision)
+   * The header: Authorization: HMAC-SHA256 <hash>
+     <hash> is computed as the base64 encoding of the SHA256 HMAC of the
+     application/x-www-form-urlencoded format parameter string. The HMAC key is
+     pre-shared and should be a fully-random 64-byte string.
+
+Addresses must be in a standard format parseable by getaddrinfo with
+AI_NUMERICHOST (ipv4 bytes must be base-10), and ipv6 addresses SHOULD be in
+RFC5952 format (lowercase).
+
+The access control manager provides one endpoint:
+ * <baseurl>/access
+   The controller POSTs to this endpoint to grant and revoke access. Parameters:
+   * action=[grant|revoke]
+   * mac=aabbccdd112233
+   * time=2011-08-13T17:12:52
+     The time is provided to protect against replay attacks, and is validated to
+     be within 1 minute of system time on the access control host.
+   * Authorization header as above, using the same key.
