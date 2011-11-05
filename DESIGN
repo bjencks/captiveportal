@@ -45,8 +45,10 @@ Endpoints the controller provides:
    * time=2011-08-13T17:12:52 (Almost-ISO format timestamp, 1-second precision)
    * The header: Authorization: HMAC-SHA256 <hash>
      <hash> is computed as the base64 encoding of the SHA256 HMAC of the
-     application/x-www-form-urlencoded format parameter string. The HMAC key is
-     pre-shared and should be a fully-random 64-byte string.
+     parameters. The HMAC key is pre-shared and should be a fully-random 64-byte
+     string. The string to validate is constructed of the values of the 6
+     parameters, in order, with a '\n' after each. Both ipv4 and ipv6 fields are
+     included, using an empty string if the field is absent.
 
 Addresses must be in a standard format parseable by getaddrinfo with
 AI_NUMERICHOST (ipv4 bytes must be base-10), and ipv6 addresses SHOULD be in

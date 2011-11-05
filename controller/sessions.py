@@ -4,6 +4,7 @@ import ipaddr
 from dbconn import with_dbconn
 import access_control
 from mac import MAC
+import common
 
 class AlreadyLoggedInError(Exception):
     def __init__(self, user, mac, start):
@@ -52,9 +53,10 @@ def session_started(con, source, mac, time, ipv4=None, ipv6=None):
     # # previous open sessions, so we at least get a record that it got
     # # reopened.
     cur = con.execute('UPDATE addr_sessions SET end = ?'
-                      ' WHERE source = ? AND mac = ? AND ipv4 IS ? AND ipv6 IS ?',
-                      (time, source, mac.bytes, ipv4_to_bytes(ipv4),
-                       ipv6_to_bytes(ipv6)))
+                      ' WHERE source = ? AND mac = ? AND ipv4 IS ?'
+                      ' AND ipv6 IS ? AND end IS NULL',
+                      (time, source, mac.bytes, common.ipv4_to_bytes(ipv4),
+                       common.ipv6_to_bytes(ipv6)))
     if cur.rowcount > 0:
         logger().warn(('Closed {0:d} existing {1} sessions for '
                        '{2!r} {3!r} {4!r}').format(cur.rowcount, source, mac,
@@ -71,8 +73,8 @@ def session_started(con, source, mac, time, ipv4=None, ipv6=None):
     con.execute('INSERT INTO addr_sessions'
                 ' (user_session, mac, source, ipv4, ipv6, start)'
                 ' VALUES (?,?,?,?,?,?)',
-                (usersess, mac.bytes, source, ipv4_to_bytes(ipv4),
-                 ipv6_to_bytes(ipv6), time))
+                (usersess, mac.bytes, source, common.ipv4_to_bytes(ipv4),
+                 common.ipv6_to_bytes(ipv6), time))
     logger().info(('Session from {2} started at {5!s}: {1!r} {3!r} {4!r}'
                     ' (matched with user session {0!s})'
                    ).format(usersess, mac, source, ipv4, ipv6, time))
@@ -100,9 +102,9 @@ def session_ended(con, source, mac, time, ipv4=None, ipv6=None):
     pass
     cur = con.execute('SELECT id, user_session FROM addr_sessions'
                       ' WHERE source = ? AND mac = ?'
-                      ' AND ipv4 IS ? AND ipv6 IS ?',
-                      (source, mac.bytes, ipv4_to_bytes(ipv4),
-                       ipv6_to_bytes(ipv6)))
+                      ' AND ipv4 IS ? AND ipv6 IS ? AND end IS NULL',
+                      (source, mac.bytes, common.ipv4_to_bytes(ipv4),
+                       common.ipv6_to_bytes(ipv6)))
     rows = cur.fetchall()
     addr_sessions = [row[0] for row in rows]
     user_sessions = set([row[1] for row in rows])
@@ -140,8 +142,8 @@ def all_sessions(con):
     # KLUDGE: This should be a generator, but since the generator gets passed
     # back up out of the with_dbconn decorator, the connection is closed before
     # the generator is evaluated.
-    return [(row[0], MAC(row[1]), row[2], row[3], row[4], bytes_to_ipv4(row[5]),
-             bytes_to_ipv6(row[6]), row[7], row[8]) for row in cur]
+    return [(row[0], MAC(row[1]), row[2], row[3], row[4], common.bytes_to_ipv4(row[5]),
+             common.bytes_to_ipv6(row[6]), row[7], row[8]) for row in cur]
         
 
 def end_user_session(con, sessid):
@@ -158,26 +160,5 @@ def end_user_session(con, sessid):
     con.execute('UPDATE user_sessions SET end = datetime(\'now\')'
                 ' WHERE id = ?', (sessid,))
     cur = con.execute('SELECT mac FROM user_sessions WHERE id = ?', (sessid,))
-    access_control.revoke(cur.fetchone()[0])
+    access_control.revoke(MAC(cur.fetchone()[0]))
 
-def ipv4_to_bytes(addr):
-    if addr is None:
-        return None
-    else:
-        return struct.pack('!I', int(addr))
-def ipv6_to_bytes(addr):
-    if addr is None:
-        return None
-    else:
-        return struct.pack('!QQ', int(addr)>>64, int(addr) % (1<<64))
-def bytes_to_ipv4(by):
-    if by is None:
-        return None
-    else:
-        return ipaddr.IPv4Address(struct.unpack('!I', by)[0])
-def bytes_to_ipv6(by):
-    if by is None:
-        return None
-    else:
-        (high, low) = struct.unpack('!QQ', by)
-        return ipaddr.IPv6Address((high << 64) + low)

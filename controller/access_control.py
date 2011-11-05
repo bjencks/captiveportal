@@ -1,4 +1,5 @@
-CUR_ALLOWED = {}
+import logging
+CUR_ALLOWED = set()
 
 def logger():
     return logging.getLogger('access_control')
