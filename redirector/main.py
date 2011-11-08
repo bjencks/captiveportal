@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import sys
+import os
 import arpnd
 import asyncserver
 import logging
@@ -8,10 +9,18 @@ import logging.handlers
 import urllib.parse
 import xml.sax.saxutils
 import datetime
+import socket
+import pwd
 
 PORT = 8080
 
-REDIR_URL = b'http://localhost:8090/splash'
+REDIR_URL = b'http://vps.bjencks.net:8080/splash'
+
+# Should really be socket.IP_TRANSPARENT, but it's not defined there.
+IP_TRANSPARENT = 19
+
+# Drop privileges to this user and its group
+RUNAS = 'nobody'
 
 def setup_logging(name):
     loghandler = logging.handlers.SysLogHandler('/dev/log',
@@ -79,5 +88,23 @@ class RedirectorServer(asyncserver.BufferedSocket):
         self.writebuf += b'\r\n'
         self.writebuf += content
 
+def drop_privs():
+    pwdent = pwd.getpwnam(RUNAS)
+    os.setgid(pwdent.pw_gid)
+    os.setuid(pwdent.pw_uid)
+
 if __name__ == "__main__":
-    asyncserver.main(PORT, RedirectorServer)
+    addrinfos = socket.getaddrinfo(None, PORT, 0, socket.SOCK_STREAM,
+                                   socket.SOL_TCP, socket.AI_PASSIVE)
+    listeners = []
+    for (family, socktype, proto, _, sockaddr) in addrinfos:
+        sock = socket.socket(family, socktype, proto)
+        if family == socket.AF_INET6:
+            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_IP, IP_TRANSPARENT, 1)
+        sock.bind(sockaddr)
+        sock.listen(255)
+        listeners.append(sock)
+    drop_privs()
+    asyncserver.main(listeners, RedirectorServer)

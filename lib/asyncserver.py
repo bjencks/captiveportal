@@ -203,19 +203,8 @@ def event_to_str(ev):
             names.append(name)
     return ','.join(names)
 
-def register_listeners(port, connlist, sockclass):
-    addrinfos = socket.getaddrinfo(None, port, 0, socket.SOCK_STREAM,
-                                   socket.SOL_TCP, socket.AI_PASSIVE)
-    for (family, socktype, proto, _, sockaddr) in addrinfos:
-        sock = socket.socket(family, socktype, proto)
-        if family == socket.AF_INET6:
-            sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(sockaddr)
-        sock.listen(255)
-        wrapped = ListenSocket(sock, sockclass, connlist)
-
-def main(port, sockclass):
+def main(listeners, sockclass):
     connlist = EPollConnList()
-    register_listeners(port, connlist, sockclass)
+    for sock in listeners:
+        wrapped = ListenSocket(sock, sockclass, connlist)
     connlist.mainloop()
