@@ -1,0 +1,29 @@
+def encode_netstring(s):
+    return str(len(s)).encode('ascii') + b':' + s + b','
+
+def consume_netstring(s):
+    """If s is a bytestring beginning with a netstring, returns (value, rest)
+    where value is the contents of the netstring, and rest is the part of s
+    after the netstring.
+    
+    Raises ValueError if s does not begin with a netstring.
+    
+    """
+    (length, sep, rest) = s.partition(b':')
+    if sep != b':':
+        raise ValueError("No colon found in s")
+    if not length.isdigit():
+        raise ValueError("Length is not numeric")
+    length = int(length)
+    if len(rest) <= length:
+        raise ValueError("String not long enough")
+    if rest[length] != 0x2c:
+        raise ValueError("String not terminated with comma")
+    return (rest[:length], rest[length+1:])
+
+def is_netstring(s):
+    try:
+        (val, rest) = consume_netstring(s)
+        return len(rest) == 0
+    except ValueError:
+        return False
