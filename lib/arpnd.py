@@ -10,12 +10,12 @@ VALID_STATES = ('REACHABLE', 'DELAY', 'STALE')
 def parse_ipneigh_line(line, cons):
     try:
         tokens = line.split()
-        ip = cons(tokens[0])
-        mac = MAC(tokens[tokens.index('lladdr') + 1])
         state = tokens[-1]
         if state not in VALID_STATES:
             return None
-        return (ip, mac)
+        ip = cons(tokens[0])
+        mac = MAC(tokens[tokens.index('lladdr') + 1])
+        return (mac, ip)
     except:
         LOGGER.exception("Failed to parse line {0!r}".format(line))
         return None
@@ -45,6 +45,6 @@ def get_mac_for_addr(addr):
         LOGGER.warning('More than one result for {0!r}'.format(addr))
     ipneigh = parse_ipneigh_line(lines[0], addr.__class__)
     if ipneigh:
-        return ipneigh[1]
+        return ipneigh[0]
     else:
         return None

@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 import sys
 
-SESSION_URL = 'http://localhost:8080/session'
+SESSION_URL = 'http://vps.bjencks.net:8080/session'
 
 LOGGER = logging.getLogger('session')
 
@@ -18,7 +18,7 @@ def submit_session(action=None, source=None, mac=None, ipv4=None, ipv6=None,
         params['ipv4'] = str(ipv4)
     if ipv6:
         params['ipv6'] = str(ipv6)
-    body = urllib.parse.urlencode(params)
+    body = urllib.parse.urlencode(params).encode('ascii')
     params['key'] = key
     auth_header = common.gen_authorization_header(**params)
     req = urllib.request.Request(SESSION_URL, data=body)

@@ -1,4 +1,4 @@
-#!/usr/bin/python3.1
+#!/usr/bin/python3
 """
 CREATE TABLE sessions (
   id INTEGER PRIMARY KEY,
@@ -10,7 +10,7 @@ CREATE TABLE queue (
   action TEXT,
   mac macaddr,
   ip ipv4addr,
-  time datetime
+  time timestamp
 );
 """
 
@@ -28,11 +28,11 @@ LOGGER = session.setup_logging('arp-watcher')
 
 KEY =  b"z\xee\xd3\x0e\x83z\xee\x8a]\t\xb45\x8c\xb9]MP^gwo\x83\x03\xccdi\xb7\x9b:?e*\xc71\xd2\xb1\x8c\x9eo\xb5\xc0I+<{\xdb\xc2\x08l\x87\x05\xc8\xbf\xc8j\x84'C\x1f\xe7\xef\xef\xfb\xc8"
 
-VALID_IFACE = 'eth0'
+VALID_IFACE = 'eth0.10'
 
 def enqueue_session(con, action, mac, ip):
     con.execute('INSERT INTO queue (action, mac, ip, time)'
-                ' VALUES (?,?,?,?)', (action, mac, ip, datetime.datetime.now()))
+                ' VALUES (?,?,?,?)', (action, mac, ip, datetime.datetime.utcnow()))
 def start_session(con, mac, ip):
     con.execute('INSERT INTO sessions (mac, ip) VALUES (?,?)', (mac, ip))
     enqueue_session(con, 'start', mac, ip)
@@ -44,7 +44,7 @@ def end_session(con, sessid, mac, ip):
 
 
 def session_exists(con, sess):
-    if con.execute('SELECT id FROM sessions WHERE ip = ? AND mac = ?', sess).fetchone():
+    if con.execute('SELECT id FROM sessions WHERE mac = ? AND ip = ?', sess).fetchone():
         return True
     return False
 
@@ -53,7 +53,7 @@ def get_open_sessions(con):
         yield row
 
 def pop_session(con):
-    row = con.execute('SELECT id, action, mac, ip, time FROM queue LIMIT 1')
+    row = con.execute('SELECT id, action, mac, ip, time FROM queue LIMIT 1').fetchone()
     if row:
         sessid, action, mac, ip, time = row
         con.execute('DELETE FROM queue WHERE id = ?', (sessid,))
@@ -62,8 +62,8 @@ def pop_session(con):
 
 def main(con):
     with con:
-        current_sessions = get_current_sessions(4, VALID_IFACE)
-        for sessid, mac, ipv4 in arpnd.get_open_sessions(con):
+        current_sessions = arpnd.get_current_sessions(4, VALID_IFACE)
+        for sessid, mac, ipv4 in get_open_sessions(con):
             if (mac, ipv4) not in current_sessions:
                 end_session(con, sessid, mac, ipv4)
         for mac, ipv4 in current_sessions:
