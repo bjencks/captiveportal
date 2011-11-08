@@ -42,7 +42,8 @@ Endpoints the controller provides:
    * Zero or one of:
      * ipv4=192.0.2.15
      * ipv6=2001:db8::57
-   * time=2011-08-13T17:12:52 (Almost-ISO format timestamp, 1-second precision)
+   * time=2011-08-13T17:12:52 (Almost-ISO format timestamp, 1-second precision,
+     UTC)
    * The header: Authorization: HMAC-SHA256 <hash>
      <hash> is computed as the base64 encoding of the SHA256 HMAC of the
      parameters. The HMAC key is pre-shared and should be a fully-random 64-byte
@@ -54,12 +55,17 @@ Addresses must be in a standard format parseable by getaddrinfo with
 AI_NUMERICHOST (ipv4 bytes must be base-10), and ipv6 addresses SHOULD be in
 RFC5952 format (lowercase).
 
-The access control manager provides one endpoint:
- * <baseurl>/access
-   The controller POSTs to this endpoint to grant and revoke access. Parameters:
-   * action=[grant|revoke]
-   * mac=aabbccdd112233
-   * time=2011-08-13T17:12:52
-     The time is provided to protect against replay attacks, and is validated to
-     be within 1 minute of system time on the access control host.
-   * Authorization header as above, using the same key.
+The access control manager doesn't use HTTP, it has a simple TCP-based protocol.
+Each request must be sent in a new connection. A request consists of a single
+netstring (see <http://cr.yp.to/proto/netstrings.txt>). The contents are four netstrings:
+ * The action: [grant|revoke]
+ * The mac: aabbccdd112233
+ * The time: 2011-08-13T17:12:52
+   The time is provided to protect against replay attacks, and is validated to
+   be within 1 minute of system time on the access control host.
+ * An HMAC of the previous three netstrings (post-encoding) concatenated
+   together. The value is base64 encoded.
+If the request is malformed, the connection will be closed with no response. If
+the request is successful, a single netstring with the value "OK" will be sent.
+If the request is well-formed but cannot be completed, a single netstring with
+the value "ERROR " plus an error message will be sent.
