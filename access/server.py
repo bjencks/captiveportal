@@ -9,8 +9,14 @@ import urllib.parse
 import datetime
 import socket
 import netstring
+from mac import MAC
+import hashlib
+import hmac
+import base64
 
 PORT = 7000
+
+TIMEWINDOW = datetime.timedelta(minutes=1) # Plus or minus one minute
 
 ACCESSKEY = b'\xd7\xb4\xaa\x1fZ^\x8c\x93\x80\xa6\xccC}\x86T\xf1^\xeb\x05\xcb\xce\xe6\xd4\xcf\x04\xa9()E\xcer\xf5\x9c\x1eq\xf0P\x03\xe3\x8bg\x9e\x08ZY\x83\xfa\x17\x8fU\x82\x19qMV\x9bd\xa9*\xc5\xbf\xa6\xc9\xee'
 
@@ -36,8 +42,37 @@ class AccessServer(asyncserver.BufferedSocket):
     def request_complete(self):
         return netstring.is_netstring(self.readbuf)
     def generate_response(self):
-        LOGGER.info('Request received: ' + str(self.readbuf))
-        self.writebuf += netstring.encode_netstring(b'OK')
+        (request, _) = netstring.consume_netstring(self.readbuf)
+        (sig, request) = netstring.consume_netstring(request)
+        sig = base64.standard_b64decode(sig)
+        mysig = hmac.new(ACCESSKEY, request, hashlib.sha256).digest()
+        if sig != mysig:
+            self.writebuf = b'ERROR Bad signature'
+            return
+        (action, request) = netstring.consume_netstring(request)
+        (mac, request) = netstring.consume_netstring(request)
+        (time, request) = netstring.consume_netstring(request)
+        if len(request) > 0:
+            raise Exception('Invalid request: too long: ' + repr(self.readbuf))
+        mac = MAC(mac.decode('ascii'))
+        time = datetime.datetime.strptime(time.decode('ascii'),
+                                          '%Y-%m-%dT%H:%M:%S')
+        now = datetime.datetime.utcnow()
+        if time < (now - TIMEWINDOW) or time > (now + TIMEWINDOW):
+            self.writebuf = b'ERROR Time out of sync'
+            return
+        if action not in (b'grant', b'revoke'):
+            self.writebuf = b'ERROR Invalid action'
+            return
+        if action == b'grant':
+            print('grant', str(mac))
+        elif action == b'revoke':
+            print('revoke', str(mac))
+        resp = sys.stdin.readline().strip()
+        if resp == 'OK':
+            self.writebuf = netstring.encode_netstring(b'OK')
+        else:
+            self.writebuf = netstring.encode_netstring(b'ERROR ' + resp.encode('ascii'))
 
 if __name__ == "__main__":
     addrinfos = socket.getaddrinfo(None, PORT, 0, socket.SOCK_STREAM,

@@ -21,8 +21,8 @@ def send_message(message, mac):
     strtosign = (netstring.encode_netstring(message)
                  + netstring.encode_netstring(mac.rawstr().encode('ascii'))
                  + date)
-    strtosend = netstring.encode_netstring(strtosign
-                                           + hmac_netstring(strtosign))
+    strtosend = netstring.encode_netstring(hmac_netstring(strtosign)
+                                           + strtosign)
     sock = socket.create_connection((config.ACCESSHOST, config.ACCESSPORT),
                                     config.ACCESSTIMEOUT)
     try:

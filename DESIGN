@@ -57,14 +57,15 @@ RFC5952 format (lowercase).
 
 The access control manager doesn't use HTTP, it has a simple TCP-based protocol.
 Each request must be sent in a new connection. A request consists of a single
-netstring (see <http://cr.yp.to/proto/netstrings.txt>). The contents are four netstrings:
+netstring (see <http://cr.yp.to/proto/netstrings.txt>). The contents are four
+netstrings:
+ * An HMAC of the following three netstrings (post-encoding) concatenated
+   together. The value is base64 encoded.
  * The action: [grant|revoke]
  * The mac: aabbccdd112233
  * The time: 2011-08-13T17:12:52
    The time is provided to protect against replay attacks, and is validated to
    be within 1 minute of system time on the access control host.
- * An HMAC of the previous three netstrings (post-encoding) concatenated
-   together. The value is base64 encoded.
 If the request is malformed, the connection will be closed with no response. If
 the request is successful, a single netstring with the value "OK" will be sent.
 If the request is well-formed but cannot be completed, a single netstring with
