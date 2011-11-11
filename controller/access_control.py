@@ -1,19 +1,43 @@
 import logging
-CUR_ALLOWED = set()
+import netstring
+import config
+import hmac
+import base64
+import hashlib
+import socket
+import datetime
 
 def logger():
     return logging.getLogger('access_control')
 
+def hmac_netstring(s):
+    return netstring.encode_netstring(base64.standard_b64encode(
+        hmac.new(config.ACCESSKEY, s, hashlib.sha256).digest()))
+
+def send_message(message, mac):
+    # Law of Demeter? Hahahahaha
+    date = netstring.encode_netstring(datetime.datetime.utcnow()
+            .replace(microsecond=0).isoformat().encode('ascii'))
+    strtosign = (netstring.encode_netstring(message)
+                 + netstring.encode_netstring(mac.rawstr().encode('ascii'))
+                 + date)
+    strtosend = netstring.encode_netstring(strtosign
+                                           + hmac_netstring(strtosign))
+    sock = socket.create_connection((config.ACCESSHOST, config.ACCESSPORT),
+                                    config.ACCESSTIMEOUT)
+    try:
+        sock.settimeout(config.ACCESSTIMEOUT)
+        sock.sendall(strtosend)
+        resp = sock.recv(256)
+        (resp, _) = netstring.consume_netstring(resp)
+        if resp != b'OK':
+            raise Exception('Error sending message {0!r}: {1!r}'
+                            .format(strtosend, resp))
+    finally:
+        sock.close()
+
 def authorize(mac):
-    if mac in CUR_ALLOWED:
-        logger().error('Attempted to add {0!r} twice'.format(mac))
-    else:
-        CUR_ALLOWED.add(mac)
-        logger().info('Authorized {0!r}'.format(mac))
+    send_message(b'grant', mac)
 
 def revoke(mac):
-    if mac not in CUR_ALLOWED:
-        logger().error('Attempted to remove {0!r} twice'.format(mac))
-    else:
-        CUR_ALLOWED.remove(mac)
-        logger().info('Revoked {0!r}'.format(mac))
+    send_message(b'revoke', mac)
