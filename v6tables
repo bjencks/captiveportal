@@ -1,0 +1,20 @@
+*mangle
+:PREROUTING ACCEPT [0:0]
+:captive - [0:0]
+:allowed - [0:0]
+-A PREROUTING -i eth0.10 -j captive
+-A captive -d 2607:f128:42:d6::2 -p tcp --dport 8080 -j ACCEPT
+-A captive -j allowed
+-A captive -j MARK --set-mark 1/3
+-A captive -p tcp --dport 80 -j TPROXY --on-port 8080 --tproxy-mark 2/3
+-A allowed -j ACCEPT
+COMMIT
+*filter
+:FORWARD ACCEPT [0:0]
+:captive - [0:0]
+-A FORWARD -m mark --mark 1/3 -j captive
+-A captive -p udp --dport 53 -j RETURN
+-A captive -p tcp --dport 53 -j RETURN
+-A captive -d 2607:f128:42:d6::2 -p tcp --dport 8080 -j RETURN
+-A captive -j DROP
+COMMIT
