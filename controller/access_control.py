@@ -28,6 +28,7 @@ def send_message(message, mac):
     try:
         sock.settimeout(config.ACCESSTIMEOUT)
         sock.sendall(strtosend)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         resp = sock.recv(256)
         (resp, _) = netstring.consume_netstring(resp)
         if resp != b'OK':

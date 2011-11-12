@@ -160,5 +160,9 @@ def end_user_session(con, sessid):
     con.execute('UPDATE user_sessions SET end = datetime(\'now\')'
                 ' WHERE id = ?', (sessid,))
     cur = con.execute('SELECT mac FROM user_sessions WHERE id = ?', (sessid,))
-    access_control.revoke(MAC(cur.fetchone()[0]))
+    mac = MAC(cur.fetchone()[0])
+    try:
+        access_control.revoke(mac)
+    except:
+        logger().exception('Failed to revoke mac {0!s}'.format(mac))
 
