@@ -64,10 +64,12 @@ class AccessServer(asyncserver.BufferedSocket):
         if action not in (b'grant', b'revoke'):
             self.writebuf = b'ERROR Invalid action'
             return
+        LOGGER.info('Valid request to {0!r} {1!s}'.format(action, mac))
         if action == b'grant':
             print('grant', str(mac))
         elif action == b'revoke':
             print('revoke', str(mac))
+        sys.stdout.flush()
         resp = sys.stdin.readline().strip()
         if resp == 'OK':
             self.writebuf = netstring.encode_netstring(b'OK')
