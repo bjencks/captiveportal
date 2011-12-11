@@ -1,0 +1,7 @@
+It's a simple captive portal. You need to be able to program to use it. Read
+DESIGN to see what you'll have to write; once you're done with that you should
+understand it well enough to deploy it. Someday I might write some installation
+instructions.
+
+netsetup.sh, v{4,6}tables are just sample scripts that I used for testing.
+You'll want something similar, but different.
